@@ -499,6 +499,8 @@ def readCommand( argv ):
                       metavar = 'TYPE', default='RandomGhost')
     parser.add_option('-k', '--numghosts', type='int', dest='numGhosts',
                       help=default('The maximum number of ghosts to use'), default=4)
+    parser.add_option('-d', '--maxDots', type='int', dest='max_dots',
+                      help=default('The maximum number of food dots to use'), default=0)
     parser.add_option('-z', '--zoom', type='float', dest='zoom',
                       help=default('Zoom the size of the graphics window'), default=1.0)
     parser.add_option('-f', '--fixRandomSeed', action='store_true', dest='fixRandomSeed',
@@ -527,7 +529,8 @@ def readCommand( argv ):
     if options.fixRandomSeed: random.seed('cs188')
 
     # Choose a layout
-    args['layout'] = layout.getLayout( options.layout )
+    #print("max_dots0",options.max_dots)
+    args['layout'] = layout.getLayout( options.layout,max_dots=options.max_dots)
     if args['layout'] == None: raise Exception("The layout " + options.layout + " cannot be found")
 
     # Choose a Pacman agent

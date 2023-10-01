@@ -21,7 +21,7 @@ class Layout:
     A Layout manages the static information about the game board.
     """
 
-    def __init__(self, layoutText):
+    def __init__(self, layoutText,max_dots,dots_live=None):
         self.width = len(layoutText[0])
         self.height= len(layoutText)
         self.walls = Grid(self.width, self.height, False)
@@ -29,8 +29,9 @@ class Layout:
         self.capsules = []
         self.agentPositions = []
         self.numGhosts = 0
-        self.processLayoutText(layoutText)
+        self.processLayoutText(layoutText,max_dots=max_dots,dots_live=dots_live)
         self.layoutText = layoutText
+        self.max_dots=max_dots
         # self.initializeVisibilityMatrix()
 
     def getNumGhosts(self):
@@ -86,9 +87,9 @@ class Layout:
         return "\n".join(self.layoutText)
 
     def deepCopy(self):
-        return Layout(self.layoutText[:])
+        return Layout(self.layoutText[:],max_dots=self.max_dots,dots_live=self.dots_live)
 
-    def processLayoutText(self, layoutText):
+    def processLayoutText(self, layoutText,max_dots=0,dots_live=None):
         """
         Coordinates are flipped from the input format to the (x,y) convention here
 
@@ -101,10 +102,22 @@ class Layout:
          P - Pacman
         Other characters are ignored.
         """
+        #print("max_dots",max_dots)
         maxY = self.height - 1
+        num_dots_in_text=sum([1 if layoutText[y][x]=="." else 0 for y in range(self.height) for x in range(self.width)])
+        if dots_live==None:
+            dots_live=list(range(num_dots_in_text))
+            random.shuffle(dots_live)
+        self.dots_live=dots_live
+        dot_count=0
         for y in range(self.height):
             for x in range(self.width):
-                layoutChar = layoutText[maxY - y][x]
+                #layoutChar = layoutText[maxY - y][x]
+                layoutChar = layoutText[y][x]
+                if layoutChar==".":
+                    if dots_live[dot_count]>=max_dots and max_dots>0:
+                        layoutChar=" "
+                    dot_count+=1
                 self.processLayoutChar(x, y, layoutChar)
         self.agentPositions.sort()
         self.agentPositions = [ ( i == 0, pos) for i, pos in self.agentPositions]
@@ -124,24 +137,26 @@ class Layout:
         elif layoutChar in  ['1', '2', '3', '4']:
             self.agentPositions.append( (int(layoutChar), (x,y)))
             self.numGhosts += 1
-def getLayout(name, back = 2):
+def getLayout(name, back = 2,max_dots=0):
+    #print("getLayout",max_dots)
     if name.endswith('.lay'):
-        layout = tryToLoad('layouts/' + name)
-        if layout == None: layout = tryToLoad(name)
+        layout = tryToLoad('layouts/' + name,max_dots=max_dots)
+        if layout == None: layout = tryToLoad(name,max_dots=max_dots)
     else:
-        layout = tryToLoad('layouts/' + name + '.lay')
-        if layout == None: layout = tryToLoad(name + '.lay')
+        layout = tryToLoad('layouts/' + name + '.lay',max_dots=max_dots)
+        if layout == None: layout = tryToLoad(name + '.lay',max_dots=max_dots)
     if layout == None and back >= 0:
         curdir = os.path.abspath('.')
         os.chdir('..')
-        layout = getLayout(name, back -1)
+        layout = getLayout(name, back -1,max_dots=max_dots)
         os.chdir(curdir)
     return layout
 
-def tryToLoad(fullname):
+def tryToLoad(fullname,max_dots):
+    #print("tryToLoad",max_dots)
     if(not os.path.exists(fullname)): return None
     f = open(fullname)
-    try: return Layout([line.strip() for line in f])
+    try: return Layout([line.strip() for line in f],max_dots)
     finally: f.close()
 
 

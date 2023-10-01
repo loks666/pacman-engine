@@ -410,7 +410,8 @@ class PacmanGraphics:
         ( x, y ) = point
         #y = self.height - y
         x = (x + 1)*self.gridSize
-        y = (self.height  - y)*self.gridSize
+        #y = (self.height  - y)*self.gridSize
+        y = (y+1)*self.gridSize
         return ( x, y )
 
     # Fixes some TK issue with off-center circles
@@ -418,7 +419,8 @@ class PacmanGraphics:
         ( x, y ) = point
         #y = self.height - y
         x = (x + 1)*self.gridSize
-        y = (self.height  - y)*self.gridSize
+        #y = (self.height  - y)*self.gridSize
+        y = (y+1)*self.gridSize
         return ( x, y )
 
     def drawWalls(self, wallMatrix):
@@ -436,12 +438,12 @@ class PacmanGraphics:
                     # draw each quadrant of the square based on adjacent walls
                     wIsWall = self.isWall(xNum-1, yNum, wallMatrix)
                     eIsWall = self.isWall(xNum+1, yNum, wallMatrix)
-                    nIsWall = self.isWall(xNum, yNum+1, wallMatrix)
-                    sIsWall = self.isWall(xNum, yNum-1, wallMatrix)
-                    nwIsWall = self.isWall(xNum-1, yNum+1, wallMatrix)
-                    swIsWall = self.isWall(xNum-1, yNum-1, wallMatrix)
-                    neIsWall = self.isWall(xNum+1, yNum+1, wallMatrix)
-                    seIsWall = self.isWall(xNum+1, yNum-1, wallMatrix)
+                    nIsWall = self.isWall(xNum, yNum-1, wallMatrix)
+                    sIsWall = self.isWall(xNum, yNum+1, wallMatrix)
+                    nwIsWall = self.isWall(xNum-1, yNum-1, wallMatrix)
+                    swIsWall = self.isWall(xNum-1, yNum+1, wallMatrix)
+                    neIsWall = self.isWall(xNum+1, yNum-1, wallMatrix)
+                    seIsWall = self.isWall(xNum+1, yNum+1, wallMatrix)
 
                     # NE quadrant
                     if (not nIsWall) and (not eIsWall):
