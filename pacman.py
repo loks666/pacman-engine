@@ -101,6 +101,10 @@ class GameState:
         if agentIndex == 0:  # Pacman is moving
             state.data._eaten = [False for i in range(state.getNumAgents())]
             PacmanRules.applyAction( state, action )
+            if state.data.score<-1500:
+                # Pacman seems to have got stuck.  Time out and abort game.
+                state.data._lose = True
+
         else:                # A ghost is moving
             GhostRules.applyAction( state, action, agentIndex )
 
@@ -348,6 +352,9 @@ class PacmanRules:
         if manhattanDistance( nearest, next ) <= 0.5 :
             # Remove food
             PacmanRules.consume( nearest, state )
+        #if state.data.score<-1000:
+        #    print("Score state.data.score","game",game.gameOver)
+        #    game.gameOver=True
     applyAction = staticmethod( applyAction )
 
     def consume( position, state ):
