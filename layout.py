@@ -150,13 +150,16 @@ def getLayout(name, back = 2,max_dots=0):
         os.chdir('..')
         layout = getLayout(name, back -1,max_dots=max_dots)
         os.chdir(curdir)
+    layout.name=name
     return layout
 
 def tryToLoad(fullname,max_dots):
     #print("tryToLoad",max_dots)
     if(not os.path.exists(fullname)): return None
     f = open(fullname)
-    try: return Layout([line.strip() for line in f],max_dots)
+    try: 
+        result=Layout([line.strip() for line in f],max_dots)
+        return result
     finally: f.close()
 
 
