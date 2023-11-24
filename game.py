@@ -345,12 +345,6 @@ class Actions:
         return neighbors
     getLegalNeighbors = staticmethod(getLegalNeighbors)
 
-    def getSuccessor(position, action):
-        dx, dy = Actions.directionToVector(action)
-        x, y = position
-        return (x + dx, y + dy)
-    getSuccessor = staticmethod(getSuccessor)
-
 class GameStateData:
     """
 
