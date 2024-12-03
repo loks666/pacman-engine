@@ -5,6 +5,7 @@ from game import Agent
 class ce811ManhattanGhostDodgerHunterAgent(Agent):
 
     def __init__(self):
+        super().__init__()
         self.escape_direction = self.in_escape_mode = self.escape_steps_remaining = self.escape_cooldown = 0
         self.previous_move = None
         self.move_history = []
