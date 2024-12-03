@@ -11,16 +11,23 @@ class ce811ManhattanGhostDodgerHunterAgent(Agent):
         self.escape_direction = None
         self.in_escape_mode = False
         self.escape_steps_remaining = 0  # 逃离模式剩余步数
+        self.escape_cooldown = 0  # 逃离模式冷却步数
         self.previous_move = None
         self.move_history = []  # 跟踪最近的移动，防止循环
-        self.history_limit = 5  # 动作历史记录限制
+        self.history_limit = 10  # 动作历史记录限制
+
+        # 定义所有鬼屋的位置（根据游戏布局调整）
+        self.ghost_house_positions = [(11, 1), (6, 1), (5, 1), (6, 2), (5, 2)]  # 根据实际游戏布局添加所有鬼屋位置
+
+        # 定义移动方向的循环顺序
+        self.direction_sequence = [Directions.EAST, Directions.NORTH, Directions.WEST, Directions.SOUTH]
+        self.current_direction_index = 0  # 当前方向索引
 
     def getAction(self, gameState):
         """
         决定 Pacman 的下一个动作。
-        Pacman 将在危险时躲避鬼魂，害怕时追捕鬼魂，并在其他情况下吃食物或胶囊。
+        Pacman 将按照预定的方向循环移动，碰到墙壁时切换到下一个方向。
         """
-
         # 获取合法动作并移除 STOP 以保持 Pacman 移动
         legal_moves = gameState.getLegalPacmanActions()
         if Directions.STOP in legal_moves:
@@ -32,17 +39,17 @@ class ce811ManhattanGhostDodgerHunterAgent(Agent):
         # 获取所有鬼魂的状态、位置和距离
         ghost_states = gameState.getGhostStates()
         ghost_scared_times = [ghostState.scaredTimer for ghostState in ghost_states]
-        ghost_positions = [ghostState.getPosition() for ghostState in ghost_states]
-        ghost_distances = [manhattanDistance(pacman_pos, ghost_pos) for ghost_pos in ghost_positions]
+        # 将鬼魂位置转换为整数元组
+        ghost_positions = [tuple(map(int, ghostState.getPosition())) for ghostState in ghost_states]
 
-        # 将鬼魂分为危险鬼魂和害怕鬼魂
+        # 将鬼魂分为危险鬼魂和害怕鬼魂，排除在鬼屋中的鬼魂
         dangerous_ghosts = []
         scared_ghosts = []
         for i in range(len(ghost_states)):
-            if ghost_scared_times[i] <= 1:
-                dangerous_ghosts.append(ghost_positions[i])
-            else:
+            if ghost_scared_times[i] > 0 and ghost_positions[i] not in self.ghost_house_positions:
                 scared_ghosts.append(ghost_positions[i])
+            elif ghost_scared_times[i] <= 0 and ghost_positions[i] not in self.ghost_house_positions:
+                dangerous_ghosts.append(ghost_positions[i])
 
         # 获取食物和胶囊的位置
         food_locations = gameState.getFood().asList()
@@ -83,148 +90,56 @@ class ce811ManhattanGhostDodgerHunterAgent(Agent):
             Directions.WEST: Directions.EAST
         }
 
-        # 如果在逃离模式，优先选择逃离方向
+        # **1. 如果在逃离模式，优先选择逃离方向**
         if self.in_escape_mode and self.escape_direction in legal_moves:
             print(f"在逃离模式，优先选择逃离方向: {self.escape_direction}，剩余逃离步数: {self.escape_steps_remaining}")
             self.escape_steps_remaining -= 1
             if self.escape_steps_remaining <= 0:
                 self.in_escape_mode = False
                 self.escape_direction = None
+                self.escape_cooldown = 5  # 设置冷却步数
+                print("已完成逃离步数，退出逃离模式，进入冷却")
             self.previous_move = self.escape_direction
             self.move_history.append(self.escape_direction)
             if len(self.move_history) > self.history_limit:
                 self.move_history.pop(0)
             return self.escape_direction
 
-        # 评估每一个合法动作
-        for move in legal_moves:
-            # 如果当前动作是上一步动作的相反方向，则跳过，避免震荡
-            if self.previous_move and move == opposite_directions.get(self.previous_move):
-                print(f"跳过反向动作: {move}")
-                continue
+        # **处理逃离模式冷却**
+        if self.escape_cooldown > 0:
+            self.escape_cooldown -= 1
 
-            dx, dy = direction_deltas[move]
-            next_x = pacman_pos[0] + dx
-            next_y = pacman_pos[1] + dy
-            next_pos = (next_x, next_y)
+        # **2. 按照方向循环移动，碰到墙壁时切换方向**
+        attempts = 0
+        max_attempts = len(self.direction_sequence)
+        while attempts < max_attempts:
+            current_direction = self.direction_sequence[self.current_direction_index]
+            if current_direction in legal_moves:
+                best_move = current_direction
+                best_score = 0  # 可以根据需要调整评分
+                print(f"按照预定方向移动: {current_direction}")
+                break
+            else:
+                # 切换到下一个方向
+                self.current_direction_index = (self.current_direction_index + 1) % len(self.direction_sequence)
+                print(f"方向 {current_direction} 被阻挡，切换到下一个方向")
+                attempts += 1
 
-            score = 0
-            debug_info = f"评估动作 {move}: 下一位置 {next_pos}, 初始分数 {score}"
-
-            # **安全评分：避免危险鬼魂**
-            for ghost_pos in dangerous_ghosts:
-                distance = manhattanDistance(next_pos, ghost_pos)
-                if distance <= 1:
-                    score -= 1000  # 高惩罚，避免死亡
-                    debug_info += f"\n  危险鬼魂在 {ghost_pos} 处，距离 {distance}, 施加惩罚 -1000"
-                else:
-                    bonus = distance * 5  # 调低奖励权重
-                    score += bonus  # 鼓励远离
-                    debug_info += f"\n  危险鬼魂在 {ghost_pos} 处，距离 {distance}, 施加奖励 +{bonus}"
-
-            # **追捕评分：追捕害怕鬼魂**
-            for ghost_pos in scared_ghosts:
-                distance = manhattanDistance(next_pos, ghost_pos)
-                if distance == 0:
-                    score += 2000  # 高奖励，吃掉鬼魂
-                    debug_info += f"\n  害怕鬼魂在 {ghost_pos} 处，将被吃掉，施加奖励 +2000"
-                else:
-                    # 距离越近，奖励越高
-                    if distance < 5:
-                        bonus = (5 - distance) * 100
-                        score += bonus
-                        debug_info += f"\n  害怕鬼魂在 {ghost_pos} 处，距离 {distance}, 施加奖励 +{bonus}"
-                    else:
-                        debug_info += f"\n  害怕鬼魂在 {ghost_pos} 处，距离 {distance}, 不施加奖励"
-
-            # **胶囊评分：如果存在危险鬼魂，鼓励吃胶囊**
-            if dangerous_ghosts and capsule_locations:
-                capsule_distance = manhattanDistance(next_pos, closest_capsule_location)
-                if capsule_distance <= 5:
-                    bonus = (5 - capsule_distance) * 50
-                    score += bonus  # 鼓励接近胶囊
-                    debug_info += f"\n  存在危险鬼魂，胶囊在 {closest_capsule_location} 处，距离 {capsule_distance}, 施加奖励 +{bonus}"
-
-            # **食物评分：鼓励接近食物**
-            if closest_food_location:
-                food_distance = manhattanDistance(next_pos, closest_food_location)
-                food_penalty = food_distance * 10  # 增加食物权重
-                score -= food_penalty  # 鼓励接近食物
-                debug_info += f"\n  最近的食物在 {closest_food_location} 处，距离 {food_distance}, 施加惩罚 -{food_penalty}"
-
-            # **记录每个动作的评分和原因**
-            debug_info += f"\n  动作 {move} 的总分数: {score}"
-
-            # 打印调试信息
-            print(debug_info)
-
-            # **选择最佳动作**
-            if score > best_score:
-                best_score = score
-                best_move = move
-                debug_info_best = f"找到新的最佳动作: {move}，分数 {score}"
-                print(debug_info_best)
-
-        # 如果没有最佳动作，尝试选择逃离方向
-        if best_move is None and (dangerous_ghosts or scared_ghosts):
-            # 选择一个远离所有危险鬼魂的方向
-            escape_directions = []
-            for move in legal_moves:
-                dx, dy = direction_deltas[move]
-                escape_pos = (pacman_pos[0] + dx, pacman_pos[1] + dy)
-                # 计算移动后的总距离到所有危险鬼魂
-                total_distance = sum([manhattanDistance(escape_pos, ghost_pos) for ghost_pos in dangerous_ghosts])
-                escape_directions.append((move, total_distance))
-
-            # 选择总距离最大的方向
-            if escape_directions:
-                escape_directions.sort(key=lambda x: x[1], reverse=True)
-                best_move = escape_directions[0][0]
-                self.escape_direction = best_move
-                self.in_escape_mode = True
-                self.escape_steps_remaining = 3  # 逃离模式持续步数
-                print(f"选择逃离动作: {best_move}，逃离模式开启，逃离步数: {self.escape_steps_remaining}")
-                self.previous_move = best_move
-                self.move_history.append(best_move)
-                if len(self.move_history) > self.history_limit:
-                    self.move_history.pop(0)
-
-        # 如果仍然没有最佳动作，选择得分最高的动作
+        # 如果所有预定方向都被阻挡，选择随机合法动作
         if best_move is None:
             if legal_moves:
-                # 避免循环移动，通过检查历史记录
-                for move in legal_moves:
-                    if move not in self.move_history[-2:]:
-                        best_move = move
-                        break
-                if best_move is None:
-                    best_move = random.choice(legal_moves)
-                print(f"选择得分最高的动作: {best_move}")
-            else:
                 best_move = random.choice(legal_moves)
-                print(f"没有找到最佳动作，随机选择动作: {best_move}")
+                print(f"所有预定方向都被阻挡，随机选择动作: {best_move}")
+            else:
+                best_move = Directions.STOP
+                print("没有合法动作，选择停止")
 
-        # 打印选择的最佳动作
-        if best_move:
-            print(f"选择的动作: {best_move}，分数 {best_score}")
-            self.previous_move = best_move  # 记录当前动作
-            self.move_history.append(best_move)
-            if len(self.move_history) > self.history_limit:
-                self.move_history.pop(0)
-            # 如果不再需要逃离模式，重置逃离模式
-            if self.in_escape_mode:
-                # 检查是否已经脱离危险区域
-                dx, dy = direction_deltas[best_move]
-                next_pos = (pacman_pos[0] + dx, pacman_pos[1] + dy)
-                is_safe = all(manhattanDistance(next_pos, ghost_pos) > 1 for ghost_pos in dangerous_ghosts)
-                if is_safe:
-                    self.in_escape_mode = False
-                    self.escape_direction = None
-                    print("已脱离危险区域，退出逃离模式")
-        else:
-            best_move = random.choice(legal_moves)
-            print(f"没有找到最佳动作，随机选择动作: {best_move}")
-            self.previous_move = best_move  # 记录当前动作
+        # **记录选择的动作**
+        print(f"选择的动作: {best_move}")
+        self.previous_move = best_move
+        self.move_history.append(best_move)
+        if len(self.move_history) > self.history_limit:
+            self.move_history.pop(0)
 
         return best_move
 
@@ -255,6 +170,7 @@ class ce811ManhattanGhostDodgerHunterAgent(Agent):
                 score += distance * 5  # 调低奖励权重
 
         # **追捕评分：追捕害怕鬼魂**
+        capsule_active = closest_capsule_location and manhattanDistance(next_pos, closest_capsule_location) == 0
         for ghost_pos in scared_ghosts:
             distance = manhattanDistance(next_pos, ghost_pos)
             if distance == 0:
@@ -262,19 +178,19 @@ class ce811ManhattanGhostDodgerHunterAgent(Agent):
             else:
                 # 距离越近，奖励越高
                 if distance < 5:
-                    bonus = (5 - distance) * 100
+                    bonus = (5 - distance) * (100 if capsule_active else 80)  # 在胶囊激活时增加奖励
                     score += bonus
 
         # **胶囊评分：如果存在危险鬼魂，鼓励吃胶囊**
         if dangerous_ghosts and closest_capsule_location:
             capsule_distance = manhattanDistance(next_pos, closest_capsule_location)
             if capsule_distance <= 5:
-                bonus = (5 - capsule_distance) * 50
+                bonus = (5 - capsule_distance) * (50 if capsule_active else 40)  # 在胶囊激活时调整奖励
                 score += bonus  # 鼓励接近胶囊
 
         # **食物评分：鼓励接近食物**
         if closest_food_location:
             food_distance = manhattanDistance(next_pos, closest_food_location)
-            score -= food_distance * 10  # 增加食物权重
+            score -= food_distance * 5  # 减少食物惩罚
 
         return score
