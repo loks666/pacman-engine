@@ -16,17 +16,9 @@ class ce811ManhattanGhostDodgerHunterAgent(Agent):
     def getAction(self, gameState):
         legal_moves = gameState.getLegalActions()
         if Directions.STOP in legal_moves: legal_moves.remove(Directions.STOP)
-
-        pacman_pos = gameState.getPacmanPosition()
-        food_locations = gameState.getFood().asList()
-        pacman_x, pacman_y = pacman_pos
-        ghost_positions = gameState.getGhostPositions()
         ghost_states = gameState.getGhostStates()
         ghost_scared_times = [ghostState.scaredTimer for ghostState in ghost_states]
-        ghost_movement_directions = [ghostState.getDirection() for ghostState in ghost_states]
-
         ghost_positions = [tuple(map(int, ghostState.getPosition())) for ghostState in ghost_states]
-
         dangerous_ghosts, scared_ghosts = [], []
         for i, ghost_pos in enumerate(ghost_positions):
             if ghost_scared_times[i] > 0 and ghost_pos not in self.ghost_house_positions:
@@ -34,11 +26,7 @@ class ce811ManhattanGhostDodgerHunterAgent(Agent):
             elif ghost_pos not in self.ghost_house_positions:
                 dangerous_ghosts.append(ghost_pos)
 
-        closest_food_location = min(food_locations, key=lambda food: util.manhattanDistance(pacman_pos, food), default=None)
-        closest_food_distance = util.manhattanDistance(pacman_pos, closest_food_location) if closest_food_location else float('inf')
-
         best_move = None
-        best_score = -float('inf')
 
         if self.in_escape_mode and self.escape_direction in legal_moves:
             self.escape_steps_remaining -= 1
@@ -60,7 +48,6 @@ class ce811ManhattanGhostDodgerHunterAgent(Agent):
             current_direction = self.direction_sequence[self.current_direction_index]
             if current_direction in legal_moves:
                 best_move = current_direction
-                best_score = 0
                 break
             else:
                 self.current_direction_index = (self.current_direction_index + 1) % len(self.direction_sequence)
