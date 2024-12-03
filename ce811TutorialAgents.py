@@ -15,10 +15,8 @@ class ce811ManhattanGhostDodgerHunterAgent(Agent):
         self.previous_move = None
         self.move_history = []  # 跟踪最近的移动，防止循环
         self.history_limit = 10  # 动作历史记录限制
-
         # 定义所有鬼屋的位置（根据游戏布局调整）
         self.ghost_house_positions = [(11, 1), (6, 1), (5, 1), (6, 2), (5, 2)]  # 根据实际游戏布局添加所有鬼屋位置
-
         # 定义移动方向的循环顺序
         self.direction_sequence = [Directions.EAST, Directions.NORTH, Directions.WEST, Directions.SOUTH]
         self.current_direction_index = 0  # 当前方向索引
@@ -32,9 +30,6 @@ class ce811ManhattanGhostDodgerHunterAgent(Agent):
         legal_moves = gameState.getLegalPacmanActions()
         if Directions.STOP in legal_moves:
             legal_moves.remove(Directions.STOP)
-
-        # 获取 Pacman 的位置
-        pacman_pos = gameState.getPacmanPosition()
 
         # 获取所有鬼魂的状态、位置和距离
         ghost_states = gameState.getGhostStates()
@@ -51,44 +46,7 @@ class ce811ManhattanGhostDodgerHunterAgent(Agent):
             elif ghost_scared_times[i] <= 0 and ghost_positions[i] not in self.ghost_house_positions:
                 dangerous_ghosts.append(ghost_positions[i])
 
-        # 获取食物和胶囊的位置
-        food_locations = gameState.getFood().asList()
-        capsule_locations = gameState.getCapsules()
-
-        # 找到最近的食物
-        if food_locations:
-            closest_food_location = min(food_locations, key=lambda food: manhattanDistance(pacman_pos, food))
-            closest_food_distance = manhattanDistance(pacman_pos, closest_food_location)
-        else:
-            closest_food_location = None
-            closest_food_distance = float('inf')
-
-        # 找到最近的胶囊
-        if capsule_locations:
-            closest_capsule_location = min(capsule_locations, key=lambda cap: manhattanDistance(pacman_pos, cap))
-            closest_capsule_distance = manhattanDistance(pacman_pos, closest_capsule_location)
-        else:
-            closest_capsule_location = None
-            closest_capsule_distance = float('inf')
-
-        # 定义各个方向的坐标变化
-        direction_deltas = {
-            Directions.NORTH: (0, 1),
-            Directions.SOUTH: (0, -1),
-            Directions.EAST:  (1, 0),
-            Directions.WEST:  (-1, 0)
-        }
-
         best_move = None
-        best_score = -float('inf')
-
-        # 定义相反方向，以防止 Pacman 立即反向移动，导致震荡
-        opposite_directions = {
-            Directions.NORTH: Directions.SOUTH,
-            Directions.SOUTH: Directions.NORTH,
-            Directions.EAST: Directions.WEST,
-            Directions.WEST: Directions.EAST
-        }
 
         # **1. 如果在逃离模式，优先选择逃离方向**
         if self.in_escape_mode and self.escape_direction in legal_moves:
