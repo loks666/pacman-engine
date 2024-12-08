@@ -1,5 +1,4 @@
 from game import Directions
-import random, util
 import numpy as np
 import heapq
 from game import Agent
