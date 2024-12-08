@@ -4,7 +4,6 @@ import numpy as np
 import heapq
 from game import Agent
 
-
 def calculate_neighbouring_nodes(node, maze):
     (x, y) = node
     h = maze.height
@@ -12,10 +11,9 @@ def calculate_neighbouring_nodes(node, maze):
     res = []
     for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
         nx, ny = x + dx, y + dy
-        if 0 <= nx < w and 0 <= ny < h and maze[nx][ny] == False:
+        if 0 <= nx < w and 0 <= ny < h and not maze[nx][ny]:
             res.append((nx, ny))
     return res
-
 
 def calculate_gscores(maze, start_node):
     h = maze.height
@@ -44,7 +42,6 @@ def calculate_gscores(maze, start_node):
                 g[y][x] = 0
     return g, p
 
-
 def calc_path_to_point(end_node, parent_nodes):
     path = []
     c = end_node
@@ -64,7 +61,6 @@ def calc_path_to_point(end_node, parent_nodes):
     path.reverse()
     return path
 
-
 class ce811DijkstraRuleAgent(Agent):
     def __init__(self):
         self.route = []
@@ -80,41 +76,44 @@ class ce811DijkstraRuleAgent(Agent):
         ghosts = gameState.getGhostStates()
         caps = gameState.getCapsules()
 
-        # 调试信息：打印当前Pacman位置与基本信息
-        print("Pacman Position:", pac)
-        print("Score:", gameState.getScore())
-        print("Legal Moves:", legalMoves)
-        print("Foods:", foods)
-        print("Capsules:", caps)
+        # 关键调试信息：Pacman位置与剩余食物数量
+        print(f"Pacman位置: {pac}, 剩余食物数量: {len(foods)}")
 
         # 如果没有食物，停止行动
         if not foods:
-            print("No foods left. Stopping.")
+            print("所有食物已被吃完。")
             return Directions.STOP
+
+        # 找到最近的胶囊（如果有）
+        target_capsule = None
+        if caps:
+            min_dist_capsule = float('inf')
+            for cap in caps:
+                dist = gScores[int(cap[1]), int(cap[0])]
+                if dist < min_dist_capsule:
+                    min_dist_capsule = dist
+                    target_capsule = cap
 
         # 找到最近的食物
-        min_dist = float('inf')
-        closest_food = None
+        target_food = None
+        min_dist_food = float('inf')
         for food in foods:
             dist = gScores[int(food[1]), int(food[0])]
-            if dist < min_dist:
-                min_dist = dist
-                closest_food = food
+            if dist < min_dist_food:
+                min_dist_food = dist
+                target_food = food
 
-        if closest_food is None:
-            print("No reachable food found. Stopping.")
-            return Directions.STOP
+        # 决定优先级：如果有胶囊且距离较近，优先收集胶囊
+        prioritize_capsule = False
+        if target_capsule and min_dist_capsule < 15:  # 可以根据需要调整阈值
+            prioritize_capsule = True
 
-        # 计算到最近食物的路径
-        path = calc_path_to_point(closest_food, parents)
+        target = target_capsule if prioritize_capsule else target_food
+        path = calc_path_to_point(target, parents)
 
         if len(path) == 0:
-            print("No path to closest food found. Stopping.")
+            print("无法找到到目标的路径。")
             return Directions.STOP
-
-        # 选择路径上的第一个方向
-        desired_move = path[0]
-        print("Desired Move:", desired_move)
 
         # 检查鬼魂的位置，避免被追捕
         ghost_threat = False
@@ -124,7 +123,7 @@ class ce811DijkstraRuleAgent(Agent):
             d = gScores[gh_y][gh_x]
             if d < 5 and gh.scaredTimer <= 1:
                 ghost_threat = True
-                print(f"Ghost threat detected at distance {d} from position ({gh_x}, {gh_y})")
+                print(f"检测到鬼魂威胁，鬼魂位置: ({gh_x}, {gh_y}), 距离: {d}")
                 # 计算远离鬼魂的方向
                 away_x = pac[0] - gh_x
                 away_y = pac[1] - gh_y
@@ -139,25 +138,27 @@ class ce811DijkstraRuleAgent(Agent):
                     potential_moves.append(Directions.NORTH)
 
                 if potential_moves:
-                    chosen_move = random.choice(potential_moves)
-                    print(f"Choosing to move away from ghost: {chosen_move}")
+                    # 优先选择远离鬼魂的方向
+                    chosen_move = Directions.SOUTH if Directions.SOUTH in potential_moves else random.choice(potential_moves)
+                    print(f"选择远离鬼魂的移动方向: {chosen_move}")
                     return chosen_move
 
         # 如果没有鬼魂威胁，按计划移动
+        desired_move = path[0]
         if desired_move in legalMoves:
-            print(f"Moving towards desired move: {desired_move}")
+            print(f"按计划移动方向: {desired_move}")
             return desired_move
         else:
             # 如果计划的方向被阻挡，随机选择一个合法方向
-            print("Desired move blocked. Choosing a random legal move.")
+            print("计划的移动方向被阻挡，随机选择一个合法方向。")
             possible_moves = list(legalMoves)
-            # 移除STOP以避免停滞（根据需要保留或去除）
+            # 移除STOP以避免停滞
             if Directions.STOP in possible_moves:
                 possible_moves.remove(Directions.STOP)
             if len(possible_moves) > 0:
                 chosen_move = random.choice(possible_moves)
-                print(f"Randomly chosen move: {chosen_move}")
+                print(f"随机选择的移动方向: {chosen_move}")
                 return chosen_move
             else:
-                print("No possible moves left. Stopping.")
+                print("没有可行的移动方向，停止行动。")
                 return Directions.STOP
