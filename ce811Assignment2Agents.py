@@ -4,6 +4,7 @@ import numpy as np
 import heapq
 from game import Agent
 
+
 def calculate_neighbouring_nodes(node, maze):
     (x, y) = node
     h = maze.height
@@ -15,7 +16,8 @@ def calculate_neighbouring_nodes(node, maze):
             res.append((nx, ny))
     return res
 
-def calculate_gscores(maze, start_node):
+
+def calculate_gscores(maze, start_node, ghost_positions, ghost_radius=5, scared=False):
     h = maze.height
     w = maze.width
     INF = 999999
@@ -26,22 +28,36 @@ def calculate_gscores(maze, start_node):
     p[(sx, sy)] = None
     pq = []
     heapq.heappush(pq, (0, (sx, sy)))
+
+    # Dynamic cost map: positions near ghosts have higher cost
+    cost_map = np.ones((h, w), dtype=int)
+    for gh_pos in ghost_positions:
+        gh_x, gh_y = gh_pos
+        for x in range(max(0, gh_x - ghost_radius), min(w, gh_x + ghost_radius + 1)):
+            for y in range(max(0, gh_y - ghost_radius), min(h, gh_y + ghost_radius + 1)):
+                dist = abs(x - gh_x) + abs(y - gh_y)
+                if dist <= ghost_radius:
+                    # Increase cost based on distance to ghost
+                    cost_map[y][x] += (ghost_radius - dist + 1) * 10  # Adjust weight as needed
+
     while pq:
         d, (cx, cy) = heapq.heappop(pq)
         if d > g[cy][cx]:
             continue
         for (nx, ny) in calculate_neighbouring_nodes((cx, cy), maze):
-            nd = d + 1
+            nd = d + cost_map[ny][nx]
             if nd < g[ny][nx]:
                 g[ny][nx] = nd
                 p[(nx, ny)] = (cx, cy)
                 heapq.heappush(pq, (nd, (nx, ny)))
-    # 修正墙壁的代价为INF
+
+    # Assign INF to walls to prevent path through walls
     for x in range(w):
         for y in range(h):
             if maze[x][y]:
                 g[y][x] = INF
     return g, p
+
 
 def calc_path_to_point(end_node, parent_nodes):
     path = []
@@ -62,6 +78,7 @@ def calc_path_to_point(end_node, parent_nodes):
     path.reverse()
     return path
 
+
 class ce811DijkstraRuleAgent(Agent):
     def __init__(self):
         self.route = []
@@ -71,11 +88,16 @@ class ce811DijkstraRuleAgent(Agent):
         legalMoves = gameState.getLegalActions()
         pac = gameState.getPacmanPosition()
         maze = gameState.getWalls()
-        gScores, parents = calculate_gscores(maze, (int(pac[0]), int(pac[1])))
-
         foods = gameState.getFood().asList()
         ghosts = gameState.getGhostStates()
         caps = gameState.getCapsules()
+
+        # 获取鬼魂的位置和状态
+        ghost_positions = []
+        for gh in ghosts:
+            gh_pos = gh.getPosition()
+            gh_x, gh_y = int(gh_pos[0]), int(gh_pos[1])
+            ghost_positions.append((gh_x, gh_y))
 
         # 关键调试信息：Pacman位置与剩余食物数量
         print(f"Pacman位置: {pac}, 剩余食物数量: {len(foods)}")
@@ -90,7 +112,9 @@ class ce811DijkstraRuleAgent(Agent):
         min_dist_capsule = float('inf')
         if caps:
             for cap in caps:
-                dist = gScores[int(cap[1]), int(cap[0])]
+                cap_x, cap_y = int(cap[0]), int(cap[1])
+                # 计算曼哈顿距离
+                dist = abs(pac[0] - cap_x) + abs(pac[1] - cap_y)
                 if dist < min_dist_capsule:
                     min_dist_capsule = dist
                     target_capsule = cap
@@ -99,7 +123,8 @@ class ce811DijkstraRuleAgent(Agent):
         target_food = None
         min_dist_food = float('inf')
         for food in foods:
-            dist = gScores[int(food[1]), int(food[0])]
+            food_x, food_y = int(food[0]), int(food[1])
+            dist = abs(pac[0] - food_x) + abs(pac[1] - food_y)
             if dist < min_dist_food:
                 min_dist_food = dist
                 target_food = food
@@ -111,6 +136,7 @@ class ce811DijkstraRuleAgent(Agent):
             prioritize_capsule = True
 
         target = target_capsule if prioritize_capsule else target_food
+        gScores, parents = calculate_gscores(maze, (int(pac[0]), int(pac[1])), ghost_positions)
         path = calc_path_to_point(target, parents)
 
         if len(path) == 0:
@@ -125,17 +151,14 @@ class ce811DijkstraRuleAgent(Agent):
             # 计算移动后的新位置
             new_pos = self.get_new_position(pac, move)
             # 计算到最近食物的距离
-            food_dist = self.get_closest_food_distance(new_pos, foods, gScores)
+            food_dist = self.get_closest_food_distance(new_pos, foods)
             # 计算到最近鬼魂的距离
             ghost_dist = self.get_closest_ghost_distance(new_pos, ghosts)
             # 计算评分：安全性优先，进展次之
-            # 可以调整权重，根据需要平衡
             safety_weight = 10
             progress_weight = 1
             score = (ghost_dist * safety_weight) - (food_dist * progress_weight)
             move_scores[move] = score
-            # 打印评分信息（可选）
-            # print(f"Move: {move}, Score: {score}")
 
         # 选择最高分的移动方向
         best_move = max(move_scores, key=move_scores.get)
@@ -180,10 +203,11 @@ class ce811DijkstraRuleAgent(Agent):
         else:
             return pos  # STOP
 
-    def get_closest_food_distance(self, pos, foods, gScores):
+    def get_closest_food_distance(self, pos, foods):
         min_dist = float('inf')
         for food in foods:
-            dist = gScores[int(food[1]), int(food[0])]
+            food_x, food_y = int(food[0]), int(food[1])
+            dist = abs(pos[0] - food_x) + abs(pos[1] - food_y)
             if dist < min_dist:
                 min_dist = dist
         return min_dist
