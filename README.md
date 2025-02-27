@@ -74,10 +74,11 @@ python pacman.py [你的命令] -f -q -n 10
 1. **Python 版本**是否正确（3.12.7）🐍。
 2. **代理文件**是否已正确复制并命名为 `ce811Assignment2Agents.py` 📂。
 3. **命令参数**是否正确无误 📝。
+4. python pacman.py -p ce811MyBestAgent
+5. python pacman.py -p ce811MyBestAgent -f -q -n 10
 
 祝你游戏愉快，挑战成功！🎉🍀
 
 ---
-python pacman.py -p ce811MyBestAgent
-python pacman.py -p ce811MyBestAgent -f -q -n 10
+
 如果你有任何疑问或需要进一步的帮助，请随时联系我，付费费咨询：QQ：284190056
