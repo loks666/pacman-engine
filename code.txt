@@ -1,0 +1,886 @@
+The Paper (30%)
+(NOTE: This description may change as the term goes on.)
+
+The report should consist of 6 sections plus an appendix.  Each section should be on one of the following different agents you wrote:
+ce811ManhattanGhostDodgerAgent (board layout: simpleLoopMaze)
+ce811ManhattanGhostDodgerHunterAgent (board layout: simpleLoopMazeCapsule)
+ce811OneStepLookaheadManhattanAgent (board layout: mediumClassic)
+ce811OneStepLookaheadDijkstraAgent (board layout: mediumClassic)
+ce811DijkstraRuleAgent (board layout: mediumClassic)
+ce811MyBestAgent (board layout: mediumClassic)
+Each of the above sections should cover:
+
+The code used by that agent (paste it into the document, so that it is readable).
+The summary text that comes from the program, when run for 10 games (with the command-line options -f -q -n 10) on the relevant board layout as defined above.  In particular, include the 5 summary quantities that the program gives as output which are preceded by an asterisk (so, for example, for each agent, we would include something like this:
+A written explanation of what the program logic does, and how your agent works (aim for half a page max per description).  Try and give high-level explanations, as opposed to explaining line-by-line micro-details.  (use in-line program comments and helpful variable names for line-by-line details, where necessary).  If you implemented any tricks to make your code run faster, then please explain.
+An appendix should be included to describe the Dijkstra Helper Functions section.  This appendix just needs to include:
+
+All the code for your Dijkstra algorithm (e.g. the calculate_gscores function) and its helper functions, and
+Include two screenshots from questions 4+5 of the Assignment 2 Pacman Agents quiz, proving that those functions work correctly.
+There is no need to add any explanation of your calculate_gscores function or its helper functions in your report.
+Don't repeat your Dijkstra helper functions or calculate_gScores function in any of the 6 main sections on the PacMan agents.  The idea of having this appendix is so you just include the core Dijkstra functions once in your report.
+There is no need for any introduction or conclusions section for this report. Just include the code for the above  6 agents in your report clearly and describe them, plus include the appendix.
+
+For the title page, just include "CE811 Assignment 2 (Pacman)" and your student registration number.  Note that these assignments are to be marked anonymously - so don't include your name.
+
+Note that the two Dijkstra agents will not score any marks if the first two Dijkstra path-finding questions of the Assignment 2 Pacman Agents quiz are not fully completed and passed.
+
+
+这是我的报告要求，然后我会把剩下的代码给你，帮我按照要求写一份报告
+
+
+
+1.python pacman.py -l simpleLoopMaze  -p ce811ManhattanGhostDodgerAgent -f -q -n 10
+from game import Directions
+import random, util
+from game import Agent
+
+class ce811ManhattanGhostDodgerAgent(Agent):
+
+    def __init__(self):
+        self.escape_direction = None
+        self.in_escape_mode = False
+
+    def getAction(self, gameState):
+        legal_moves = gameState.getLegalActions()
+        pacman_pos = gameState.getPacmanPosition()
+        food_locations = gameState.getFood().asList()
+
+        pacman_x, pacman_y = pacman_pos
+        ghost_positions = gameState.getGhostPositions()
+        ghost_x, ghost_y = ghost_positions[0]
+        ghost_states = gameState.getGhostStates()
+        ghost_movement_directions = [ghostState.getDirection() for ghostState in ghost_states]
+        good_moves = list(legal_moves)
+        if Directions.STOP in good_moves:
+            good_moves.remove(Directions.STOP)
+
+        direction_deltas = {
+            Directions.NORTH: (0, 1),
+            Directions.SOUTH: (0, -1),
+            Directions.EAST:  (1, 0),
+            Directions.WEST:  (-1, 0)
+        }
+
+        if self.in_escape_mode:
+            if self.escape_direction in good_moves:
+                return self.escape_direction
+            else:
+                self.in_escape_mode = False
+                self.escape_direction = None
+
+        if ghost_y == pacman_y and not self.in_escape_mode:
+            possible_escape_directions = [Directions.NORTH, Directions.SOUTH]
+            for escape_dir in possible_escape_directions:
+                if escape_dir in good_moves:
+                    self.escape_direction = escape_dir
+                    self.in_escape_mode = True
+                    return escape_dir
+            if pacman_x > ghost_x and Directions.WEST in good_moves and len(good_moves) >= 2:
+                good_moves.remove(Directions.WEST)
+            elif pacman_x < ghost_x and Directions.EAST in good_moves and len(good_moves) >= 2:
+                good_moves.remove(Directions.EAST)
+
+        if Directions.WEST in good_moves:
+            return Directions.WEST
+
+        closest_food = min(food_locations, key=lambda food_pos: util.manhattanDistance(pacman_pos, food_pos))
+        best_distance = None
+        best_move = None
+        for move in good_moves:
+            dx, dy = direction_deltas[move]
+            next_x = pacman_x + dx
+            next_y = pacman_y + dy
+            distance_to_food = util.manhattanDistance((next_x, next_y), closest_food)
+            if best_distance is None or distance_to_food < best_distance:
+                best_distance = distance_to_food
+                best_move = move
+        if best_move:
+            return best_move
+
+        return random.choice(good_moves)
+
+2.python pacman.py -l simpleLoopMazeCapsule  -p ce811ManhattanGhostDodgerHunterAgent -f -q -n 10
+from util import manhattanDistance
+from game import Directions
+import random, util
+
+from game import Agent
+
+class ce811ManhattanGhostDodgerHunterAgent(Agent):
+
+    def __init__(self):
+        # 初始化逃离方向和逃离模式
+        self.escape_direction = None
+        self.in_escape_mode = False
+        self.escape_steps_remaining = 0  # 逃离模式剩余步数
+        self.escape_cooldown = 0  # 逃离模式冷却步数
+        self.previous_move = None
+        self.move_history = []  # 跟踪最近的移动，防止循环
+        self.history_limit = 10  # 动作历史记录限制
+        # 定义所有鬼屋的位置（根据游戏布局调整）
+        self.ghost_house_positions = [(11, 1), (6, 1), (5, 1), (6, 2), (5, 2)]  # 根据实际游戏布局添加所有鬼屋位置
+        # 定义移动方向的循环顺序
+        self.direction_sequence = [Directions.EAST, Directions.NORTH, Directions.WEST, Directions.SOUTH]
+        self.current_direction_index = 0  # 当前方向索引
+
+    def getAction(self, gameState):
+        """
+        决定 Pacman 的下一个动作。
+        Pacman 将按照预定的方向循环移动，碰到墙壁时切换到下一个方向。
+        """
+        # 获取合法动作并移除 STOP 以保持 Pacman 移动
+        legal_moves = gameState.getLegalPacmanActions()
+        if Directions.STOP in legal_moves:
+            legal_moves.remove(Directions.STOP)
+
+        # 获取所有鬼魂的状态、位置和距离
+        ghost_states = gameState.getGhostStates()
+        ghost_scared_times = [ghostState.scaredTimer for ghostState in ghost_states]
+        # 将鬼魂位置转换为整数元组
+        ghost_positions = [tuple(map(int, ghostState.getPosition())) for ghostState in ghost_states]
+
+        # 将鬼魂分为危险鬼魂和害怕鬼魂，排除在鬼屋中的鬼魂
+        dangerous_ghosts = []
+        scared_ghosts = []
+        for i in range(len(ghost_states)):
+            if ghost_scared_times[i] > 0 and ghost_positions[i] not in self.ghost_house_positions:
+                scared_ghosts.append(ghost_positions[i])
+            elif ghost_scared_times[i] <= 0 and ghost_positions[i] not in self.ghost_house_positions:
+                dangerous_ghosts.append(ghost_positions[i])
+
+        best_move = None
+
+        # **1. 如果在逃离模式，优先选择逃离方向**
+        if self.in_escape_mode and self.escape_direction in legal_moves:
+            print(f"在逃离模式，优先选择逃离方向: {self.escape_direction}，剩余逃离步数: {self.escape_steps_remaining}")
+            self.escape_steps_remaining -= 1
+            if self.escape_steps_remaining <= 0:
+                self.in_escape_mode = False
+                self.escape_direction = None
+                self.escape_cooldown = 5  # 设置冷却步数
+                print("已完成逃离步数，退出逃离模式，进入冷却")
+            self.previous_move = self.escape_direction
+            self.move_history.append(self.escape_direction)
+            if len(self.move_history) > self.history_limit:
+                self.move_history.pop(0)
+            return self.escape_direction
+
+        # **处理逃离模式冷却**
+        if self.escape_cooldown > 0:
+            self.escape_cooldown -= 1
+
+        # **2. 按照方向循环移动，碰到墙壁时切换方向**
+        attempts = 0
+        max_attempts = len(self.direction_sequence)
+        while attempts < max_attempts:
+            current_direction = self.direction_sequence[self.current_direction_index]
+            if current_direction in legal_moves:
+                best_move = current_direction
+                best_score = 0  # 可以根据需要调整评分
+                print(f"按照预定方向移动: {current_direction}")
+                break
+            else:
+                # 切换到下一个方向
+                self.current_direction_index = (self.current_direction_index + 1) % len(self.direction_sequence)
+                print(f"方向 {current_direction} 被阻挡，切换到下一个方向")
+                attempts += 1
+
+        # 如果所有预定方向都被阻挡，选择随机合法动作
+        if best_move is None:
+            if legal_moves:
+                best_move = random.choice(legal_moves)
+                print(f"所有预定方向都被阻挡，随机选择动作: {best_move}")
+            else:
+                best_move = Directions.STOP
+                print("没有合法动作，选择停止")
+
+        # **记录选择的动作**
+        print(f"选择的动作: {best_move}")
+        self.previous_move = best_move
+        self.move_history.append(best_move)
+        if len(self.move_history) > self.history_limit:
+            self.move_history.pop(0)
+
+        return best_move
+
+    def evaluate_move(self, move, pacman_pos, dangerous_ghosts, scared_ghosts, closest_food_location, closest_capsule_location):
+        """
+        评估某个动作的得分
+        """
+        direction_deltas = {
+            Directions.NORTH: (0, 1),
+            Directions.SOUTH: (0, -1),
+            Directions.EAST:  (1, 0),
+            Directions.WEST:  (-1, 0)
+        }
+
+        dx, dy = direction_deltas[move]
+        next_x = pacman_pos[0] + dx
+        next_y = pacman_pos[1] + dy
+        next_pos = (next_x, next_y)
+
+        score = 0
+
+        # **安全评分：避免危险鬼魂**
+        for ghost_pos in dangerous_ghosts:
+            distance = manhattanDistance(next_pos, ghost_pos)
+            if distance <= 1:
+                score -= 1000  # 高惩罚，避免死亡
+            else:
+                score += distance * 5  # 调低奖励权重
+
+        # **追捕评分：追捕害怕鬼魂**
+        capsule_active = closest_capsule_location and manhattanDistance(next_pos, closest_capsule_location) == 0
+        for ghost_pos in scared_ghosts:
+            distance = manhattanDistance(next_pos, ghost_pos)
+            if distance == 0:
+                score += 2000  # 高奖励，吃掉鬼魂
+            else:
+                # 距离越近，奖励越高
+                if distance < 5:
+                    bonus = (5 - distance) * (100 if capsule_active else 80)  # 在胶囊激活时增加奖励
+                    score += bonus
+
+        # **胶囊评分：如果存在危险鬼魂，鼓励吃胶囊**
+        if dangerous_ghosts and closest_capsule_location:
+            capsule_distance = manhattanDistance(next_pos, closest_capsule_location)
+            if capsule_distance <= 5:
+                bonus = (5 - capsule_distance) * (50 if capsule_active else 40)  # 在胶囊激活时调整奖励
+                score += bonus  # 鼓励接近胶囊
+
+        # **食物评分：鼓励接近食物**
+        if closest_food_location:
+            food_distance = manhattanDistance(next_pos, closest_food_location)
+            score -= food_distance * 5  # 减少食物惩罚
+
+        return score
+
+3.python pacman.py -p ce811OneStepLookaheadManhattanAgent -n 10 -q -f
+from game import Directions
+from game import Agent
+from util import manhattanDistance
+import random
+
+class ce811OneStepLookaheadManhattanAgent(Agent):
+    """
+      A one-step lookahead agent which chooses an action at each choice point by examining
+      its alternatives via a state evaluation function.
+    """
+
+    def getAction(self, gameState):
+        """
+        Just like in the tutorial, getAction takes a GameState and returns
+        some Directions.X for some X in the set {North, South, West, East, Stop}
+        """
+        # Collect legal moves and successor states
+        legalMoves = gameState.getLegalActions()
+
+        # Choose one of the best actions
+        scores = [self.evaluateBoardState(gameState.generatePacmanSuccessor(action)) for action in legalMoves]
+        bestScore = max(scores)
+        bestIndices = [index for index in range(len(scores)) if scores[index] == bestScore]
+        chosenIndex = random.choice(bestIndices) # Pick randomly among the best
+        return legalMoves[chosenIndex]
+
+    def evaluateBoardState(self, gameState):
+        """
+        Evaluate the desirability of a given game state.
+
+        We start from the gameState's built-in score, then adjust it based on:
+        - Distances to non-scared ghosts (farther is better)
+        - Distances to scared ghosts (closer is better if we can eat them)
+        - Distance to the nearest food (closer is better)
+        - Distance to the nearest capsule (closer is better)
+        - The fewer the food items left, the better (although this is indirectly handled via the state score)
+        """
+
+        # Useful information from the state
+        pacman_pos = gameState.getPacmanPosition()
+        food_positions = gameState.getFood().asList()
+        ghost_states = gameState.getGhostStates()
+        capsule_positions = gameState.getCapsules()
+
+        # Current score as baseline
+        evaluation = gameState.getScore()
+
+        # Distances to food
+        if len(food_positions) > 0:
+            food_distances = [manhattanDistance(pacman_pos, food_pos) for food_pos in food_positions]
+            min_food_distance = min(food_distances)
+        else:
+            min_food_distance = 0
+
+        # Distances to ghosts
+        ghost_scared_times = [ghostState.scaredTimer for ghostState in ghost_states]
+        ghost_positions = [ghostState.getPosition() for ghostState in ghost_states]
+
+        # Separate ghosts into scared and dangerous
+        dangerous_ghost_distances = []
+        scared_ghost_distances = []
+        for (g_pos, s_time) in zip(ghost_positions, ghost_scared_times):
+            dist = manhattanDistance(pacman_pos, g_pos)
+            if s_time > 1:
+                # Ghost is scared enough to be eaten
+                scared_ghost_distances.append(dist)
+            else:
+                # Ghost is dangerous
+                dangerous_ghost_distances.append(dist)
+
+        # Distances to capsules
+        if len(capsule_positions) > 0:
+            capsule_distances = [manhattanDistance(pacman_pos, cap_pos) for cap_pos in capsule_positions]
+            min_capsule_distance = min(capsule_distances)
+        else:
+            min_capsule_distance = 0
+
+        # --- Heuristics ---
+
+        # 1. Prefer being closer to food:
+        # If min_food_distance > 0, we slightly penalize states where the nearest food is far.
+        # Using a negative factor: the farther the food, the worse the evaluation.
+        evaluation -= 2 * min_food_distance
+
+        # 2. Dangerous ghosts:
+        # We want to strongly avoid being close to dangerous ghosts.
+        # A reciprocal-based penalty works well: closer ghosts = higher penalty.
+        for dist in dangerous_ghost_distances:
+            if dist == 0:
+                # Being on the same cell as a dangerous ghost is game-ending
+                evaluation -= 1000
+            else:
+                evaluation -= 30.0 / dist  # The closer a dangerous ghost, the more we penalize
+
+        # 3. Scared ghosts:
+        # If ghosts are scared, being closer is beneficial (we can potentially eat them).
+        # Encourage chasing scared ghosts if they are reachable.
+        for dist in scared_ghost_distances:
+            if dist > 0:
+                evaluation += 20.0 / dist
+
+        # 4. Capsules:
+        # Capsules allow us to scare ghosts, so it's usually good to go towards them.
+        # We'll give a small incentive to be closer to capsules.
+        if min_capsule_distance > 0:
+            evaluation += 5.0 / (min_capsule_distance + 1)
+
+        return evaluation
+
+4.python pacman.py -p ce811OneStepLookaheadDijkstraAgent -n 10 -q -f
+from game import Directions
+from game import Agent
+from game import Actions
+import random
+import numpy as np
+import heapq
+
+def calculate_neighboring_nodes(node, maze):
+    (x, y) = node
+    h = maze.height
+    w = maze.width
+    res = []
+    for dx, dy in [(0,1),(0,-1),(1,0),(-1,0)]:
+        nx, ny = x+dx, y+dy
+        if 0<=nx<w and 0<=ny<h and maze[nx][ny]==False:
+            res.append((nx,ny))
+    return res
+
+def calculate_gscores(maze, start_node):
+    h = maze.height
+    w = maze.width
+    INF = 999999
+    g = np.full((h,w), INF, dtype=int)
+    p = {}
+    (sx,sy) = start_node
+    g[sy,sx] = 0
+    p[(sx,sy)] = None
+    pq=[]
+    heapq.heappush(pq, (0,(sx,sy)))
+    while pq:
+        d,(cx,cy)=heapq.heappop(pq)
+        if d>g[cy,cx]:
+            continue
+        for (nx,ny) in calculate_neighboring_nodes((cx,cy),maze):
+            nd=d+1
+            if nd<g[ny,nx]:
+                g[ny,nx]=nd
+                p[(nx,ny)]=(cx,cy)
+                heapq.heappush(pq,(nd,(nx,ny)))
+    for x in range(w):
+        for y in range(h):
+            if maze[x][y]:
+                g[y,x]=0
+    return g,p
+
+class ce811OneStepLookaheadDijkstraAgent(Agent):
+    def getAction(self, gameState):
+        legalMoves = gameState.getLegalActions()
+        scores = [self.evaluateBoardState(gameState.generatePacmanSuccessor(a)) for a in legalMoves]
+        m = max(scores)
+        L = [i for i,x in enumerate(scores) if x==m]
+        return legalMoves[random.choice(L)]
+
+    def evaluateBoardState(self, gameState):
+        pac = gameState.getPacmanPosition()
+        maze = gameState.getWalls()
+        gScores,parents = calculate_gscores(maze,(int(pac[0]),int(pac[1])))
+        foods = gameState.getFood().asList()
+        ghosts = gameState.getGhostStates()
+        caps = gameState.getCapsules()
+        score = gameState.getScore()
+        if foods:
+            fdists = [gScores[int(y),int(x)] for x,y in foods if gScores[int(y),int(x)]<999999]
+            if fdists:
+                score -= 2*min(fdists)
+        gdist_danger = []
+        gdist_scared = []
+        for gho in ghosts:
+            gx,gy = gho.getPosition()
+            gx,gy = int(gx),int(gy)
+            d = gScores[gy,gx]
+            if d<999999:
+                if gho.scaredTimer>1:
+                    gdist_scared.append(d)
+                else:
+                    gdist_danger.append(d)
+        for d in gdist_danger:
+            if d==0:
+                score -=1000
+            else:
+                score -=30.0/d
+        for d in gdist_scared:
+            if d>0:
+                score +=20.0/d
+        if caps:
+            cdists = [gScores[int(y),int(x)] for x,y in caps if gScores[int(y),int(x)]<999999]
+            if cdists:
+                cmin = min(cdists)
+                if cmin>0:
+                    score +=5.0/(cmin+1)
+        return score
+
+5.python pacman.py  -p ce811DijkstraRuleAgent -f -q -n 10
+from game import Directions
+import numpy as np
+import heapq
+from game import Agent
+
+
+def calculate_neighbouring_nodes(node, maze):
+    (x, y) = node
+    h = maze.height
+    w = maze.width
+    res = []
+    for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+        nx, ny = x + dx, y + dy
+        if 0 <= nx < w and 0 <= ny < h and not maze[nx][ny]:
+            res.append((nx, ny))
+    return res
+
+
+def calculate_gscores(maze, start_node, ghost_positions, ghost_radius=5, scared=False):
+    h = maze.height
+    w = maze.width
+    INF = 999999
+    g = np.full((h, w), INF, dtype=int)
+    p = {}
+    (sx, sy) = start_node
+    g[sy][sx] = 0
+    p[(sx, sy)] = None
+    pq = []
+    heapq.heappush(pq, (0, (sx, sy)))
+
+    # Dynamic cost map: positions near ghosts have higher cost
+    cost_map = np.ones((h, w), dtype=int)
+    for gh_pos in ghost_positions:
+        gh_x, gh_y = gh_pos
+        for x in range(max(0, gh_x - ghost_radius), min(w, gh_x + ghost_radius + 1)):
+            for y in range(max(0, gh_y - ghost_radius), min(h, gh_y + ghost_radius + 1)):
+                dist = abs(x - gh_x) + abs(y - gh_y)
+                if dist <= ghost_radius:
+                    # Increase cost based on distance to ghost
+                    cost_map[y][x] += (ghost_radius - dist + 1) * 10  # Adjust weight as needed
+
+    while pq:
+        d, (cx, cy) = heapq.heappop(pq)
+        if d > g[cy][cx]:
+            continue
+        for (nx, ny) in calculate_neighbouring_nodes((cx, cy), maze):
+            nd = d + cost_map[ny][nx]
+            if nd < g[ny][nx]:
+                g[ny][nx] = nd
+                p[(nx, ny)] = (cx, cy)
+                heapq.heappush(pq, (nd, (nx, ny)))
+
+    # Assign INF to walls to prevent path through walls
+    for x in range(w):
+        for y in range(h):
+            if maze[x][y]:
+                g[y][x] = INF
+    return g, p
+
+
+def calc_path_to_point(end_node, parent_nodes):
+    path = []
+    c = end_node
+    while c in parent_nodes and parent_nodes[c] is not None:
+        pa = parent_nodes[c]
+        px, py = pa
+        cx, cy = c
+        if cx == px + 1 and cy == py:
+            path.append(Directions.EAST)
+        elif cx == px - 1 and cy == py:
+            path.append(Directions.WEST)
+        elif cx == px and cy == py + 1:
+            path.append(Directions.SOUTH)
+        elif cx == px and cy == py - 1:
+            path.append(Directions.NORTH)
+        c = pa
+    path.reverse()
+    return path
+
+
+class ce811DijkstraRuleAgent(Agent):
+    def __init__(self):
+        self.route = []
+        self.last_action = Directions.STOP
+
+    def getAction(self, gameState):
+        legalMoves = gameState.getLegalActions()
+        pac = gameState.getPacmanPosition()
+        maze = gameState.getWalls()
+        foods = gameState.getFood().asList()
+        ghosts = gameState.getGhostStates()
+        caps = gameState.getCapsules()
+
+        # 获取鬼魂的位置和状态
+        ghost_positions = []
+        for gh in ghosts:
+            gh_pos = gh.getPosition()
+            gh_x, gh_y = int(gh_pos[0]), int(gh_pos[1])
+            ghost_positions.append((gh_x, gh_y))
+
+        # 关键调试信息：Pacman位置与剩余食物数量
+        print(f"Pacman位置: {pac}, 剩余食物数量: {len(foods)}")
+
+        # 如果没有食物，停止行动
+        if not foods:
+            print("所有食物已被吃完。")
+            return Directions.STOP
+
+        # 找到最近的胶囊（如果有）
+        target_capsule = None
+        min_dist_capsule = float('inf')
+        if caps:
+            for cap in caps:
+                cap_x, cap_y = int(cap[0]), int(cap[1])
+                # 计算曼哈顿距离
+                dist = abs(pac[0] - cap_x) + abs(pac[1] - cap_y)
+                if dist < min_dist_capsule:
+                    min_dist_capsule = dist
+                    target_capsule = cap
+
+        # 找到最近的食物
+        target_food = None
+        min_dist_food = float('inf')
+        for food in foods:
+            food_x, food_y = int(food[0]), int(food[1])
+            dist = abs(pac[0] - food_x) + abs(pac[1] - food_y)
+            if dist < min_dist_food:
+                min_dist_food = dist
+                target_food = food
+
+        # 决定优先级：如果有胶囊且距离较近，优先收集胶囊
+        prioritize_capsule = False
+        CAP_THRESHOLD = 15  # 可以根据需要调整阈值
+        if target_capsule and min_dist_capsule < CAP_THRESHOLD:
+            prioritize_capsule = True
+
+        target = target_capsule if prioritize_capsule else target_food
+        gScores, parents = calculate_gscores(maze, (int(pac[0]), int(pac[1])), ghost_positions)
+        path = calc_path_to_point(target, parents)
+
+        if len(path) == 0:
+            print("无法找到到目标的路径。")
+            return Directions.STOP
+
+        # 引入移动评分系统
+        move_scores = {}
+        for move in legalMoves:
+            if move == Directions.STOP:
+                continue  # 可以根据需要决定是否考虑停顿
+            # 计算移动后的新位置
+            new_pos = self.get_new_position(pac, move)
+            # 计算到最近食物的距离
+            food_dist = self.get_closest_food_distance(new_pos, foods)
+            # 计算到最近鬼魂的距离
+            ghost_dist = self.get_closest_ghost_distance(new_pos, ghosts)
+            # 计算评分：安全性优先，进展次之
+            safety_weight = 10
+            progress_weight = 1
+            score = (ghost_dist * safety_weight) - (food_dist * progress_weight)
+            move_scores[move] = score
+
+        # 选择最高分的移动方向
+        best_move = max(move_scores, key=move_scores.get)
+        best_score = move_scores[best_move]
+
+        # 判断是否存在鬼魂威胁
+        ghost_threat = False
+        for gh in ghosts:
+            gh_pos = gh.getPosition()
+            gh_x, gh_y = int(gh_pos[0]), int(gh_pos[1])
+            d = self.manhattan_distance(pac, (gh_x, gh_y))
+            if d < 5 and gh.scaredTimer <= 1:
+                ghost_threat = True
+                break
+
+        if ghost_threat:
+            # 如果存在鬼魂威胁，选择得分最高的安全移动方向
+            print(f"存在鬼魂威胁，选择移动方向: {best_move}")
+            return best_move
+        else:
+            # 如果没有威胁，按计划移动
+            desired_move = path[0]
+            if desired_move in legalMoves:
+                print(f"按计划移动方向: {desired_move}")
+                return desired_move
+            else:
+                # 如果计划的方向被阻挡，选择得分最高的移动方向
+                print("计划的移动方向被阻挡，选择得分最高的移动方向。")
+                print(f"选择移动方向: {best_move}")
+                return best_move
+
+    def get_new_position(self, pos, direction):
+        x, y = pos
+        if direction == Directions.NORTH:
+            return (x, y - 1)
+        elif direction == Directions.SOUTH:
+            return (x, y + 1)
+        elif direction == Directions.EAST:
+            return (x + 1, y)
+        elif direction == Directions.WEST:
+            return (x - 1, y)
+        else:
+            return pos  # STOP
+
+    def get_closest_food_distance(self, pos, foods):
+        min_dist = float('inf')
+        for food in foods:
+            food_x, food_y = int(food[0]), int(food[1])
+            dist = abs(pos[0] - food_x) + abs(pos[1] - food_y)
+            if dist < min_dist:
+                min_dist = dist
+        return min_dist
+
+    def get_closest_ghost_distance(self, pos, ghosts):
+        min_dist = float('inf')
+        for gh in ghosts:
+            gh_pos = gh.getPosition()
+            gh_x, gh_y = int(gh_pos[0]), int(gh_pos[1])
+            dist = self.manhattan_distance(pos, (gh_x, gh_y))
+            if dist < min_dist:
+                min_dist = dist
+        return min_dist
+
+    def manhattan_distance(self, pos1, pos2):
+        return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
+
+6.python pacman.py  -p ce811MyBestAgent -f -q -n 10
+# ce811MyBestAgents.py
+
+from game import Directions
+from game import Agent
+from game import Actions
+import random
+import numpy as np
+import heapq
+
+
+class ce811MyBestAgent(Agent):
+    def __init__(self):
+        super().__init__()
+        self.last_action = Directions.STOP
+        self.capsules = []
+        self.ghost_positions = []
+        self.ghost_scared_times = {}
+        self.foods = []
+
+    def getAction(self, gameState):
+        legalMoves = gameState.getLegalActions()
+        pac = gameState.getPacmanPosition()
+        maze = gameState.getWalls()
+        self.foods = gameState.getFood().asList()
+        ghosts = gameState.getGhostStates()
+        self.capsules = gameState.getCapsules()
+
+        self.ghost_positions = []
+        self.ghost_scared_times = {}
+        for gh in ghosts:
+            gh_pos = gh.getPosition()
+            gh_x, gh_y = int(gh_pos[0]), int(gh_pos[1])
+            self.ghost_positions.append((gh_x, gh_y))
+            self.ghost_scared_times[(gh_x, gh_y)] = gh.scaredTimer
+
+        if not self.foods:
+            return Directions.STOP
+
+        target_capsule = None
+        min_dist_capsule = float('inf')
+        for cap in self.capsules:
+            dist = self.manhattan_distance(pac, cap)
+            if dist < min_dist_capsule:
+                min_dist_capsule = dist
+                target_capsule = cap
+
+        target_food = None
+        min_dist_food = float('inf')
+        for food in self.foods:
+            dist = self.manhattan_distance(pac, food)
+            if dist < min_dist_food:
+                min_dist_food = dist
+                target_food = food
+
+        prioritize_capsule = False
+        CAP_THRESHOLD = 15
+        if target_capsule and min_dist_capsule < CAP_THRESHOLD:
+            prioritize_capsule = True
+
+        target = target_capsule if prioritize_capsule else target_food
+
+        gScores, parents = self.calculate_gscores(maze, pac)
+        path = self.calc_path_to_point(target, parents)
+
+        if not path:
+            return Directions.STOP
+
+        move_scores = {}
+        for move in legalMoves:
+            if move == Directions.STOP:
+                continue
+            new_pos = self.get_new_position(pac, move)
+            food_dist = self.get_closest_food_distance(new_pos)
+            ghost_dist = self.get_closest_ghost_distance(new_pos)
+            safety_weight = 10
+            progress_weight = 1
+            score = (ghost_dist * safety_weight) - (food_dist * progress_weight)
+            move_scores[move] = score
+
+        best_move = max(move_scores, key=move_scores.get)
+        best_score = move_scores[best_move]
+
+        ghost_threat = False
+        for gh_pos, scared_time in self.ghost_scared_times.items():
+            dist = self.manhattan_distance(pac, gh_pos)
+            if dist < 5 and scared_time <= 1:
+                ghost_threat = True
+                break
+
+        if ghost_threat:
+            return best_move
+        else:
+            desired_move = path[0]
+            if desired_move in legalMoves:
+                return desired_move
+            else:
+                return best_move
+
+    def calculate_gscores(self, maze, start_node, ghost_radius=5):
+        h = maze.height
+        w = maze.width
+        INF = 999999
+        g = np.full((h, w), INF, dtype=int)
+        p = {}
+        (sx, sy) = start_node
+        g[sy][sx] = 0
+        p[(sx, sy)] = None
+        pq = []
+        heapq.heappush(pq, (0, (sx, sy)))
+
+        cost_map = np.ones((h, w), dtype=int)
+        for gh_pos in self.ghost_positions:
+            gh_x, gh_y = gh_pos
+            for x in range(max(0, gh_x - ghost_radius), min(w, gh_x + ghost_radius + 1)):
+                for y in range(max(0, gh_y - ghost_radius), min(h, gh_y + ghost_radius + 1)):
+                    dist = abs(x - gh_x) + abs(y - gh_y)
+                    if dist <= ghost_radius:
+                        cost_map[y][x] += (ghost_radius - dist + 1) * 10
+
+        while pq:
+            d, (cx, cy) = heapq.heappop(pq)
+            if d > g[cy][cx]:
+                continue
+            for (nx, ny) in self.calculate_neighbouring_nodes((cx, cy), maze):
+                nd = d + cost_map[ny][nx]
+                if nd < g[ny][nx]:
+                    g[ny][nx] = nd
+                    p[(nx, ny)] = (cx, cy)
+                    heapq.heappush(pq, (nd, (nx, ny)))
+
+        for x in range(w):
+            for y in range(h):
+                if maze[x][y]:
+                    g[y][x] = INF
+        return g, p
+
+    def calculate_neighbouring_nodes(self, node, maze):
+        (x, y) = node
+        h = maze.height
+        w = maze.width
+        res = []
+        for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < w and 0 <= ny < h and not maze[nx][ny]:
+                res.append((nx, ny))
+        return res
+
+    def calc_path_to_point(self, end_node, parent_nodes):
+        path = []
+        c = end_node
+        while c in parent_nodes and parent_nodes[c] is not None:
+            pa = parent_nodes[c]
+            px, py = pa
+            cx, cy = c
+            if cx == px + 1 and cy == py:
+                path.append(Directions.EAST)
+            elif cx == px - 1 and cy == py:
+                path.append(Directions.WEST)
+            elif cx == px and cy == py + 1:
+                path.append(Directions.SOUTH)
+            elif cx == px and cy == py - 1:
+                path.append(Directions.NORTH)
+            c = pa
+        path.reverse()
+        return path
+
+    def get_new_position(self, pos, direction):
+        x, y = pos
+        if direction == Directions.NORTH:
+            return (x, y - 1)
+        elif direction == Directions.SOUTH:
+            return (x, y + 1)
+        elif direction == Directions.EAST:
+            return (x + 1, y)
+        elif direction == Directions.WEST:
+            return (x - 1, y)
+        else:
+            return pos
+
+    def get_closest_food_distance(self, pos):
+        min_dist = float('inf')
+        for food in self.foods:
+            dist = self.manhattan_distance(pos, food)
+            if dist < min_dist:
+                min_dist = dist
+        return min_dist
+
+    def get_closest_ghost_distance(self, pos):
+        min_dist = float('inf')
+        for gh_pos in self.ghost_positions:
+            dist = self.manhattan_distance(pos, gh_pos)
+            if dist < min_dist:
+                min_dist = dist
+        return min_dist
+
+    def manhattan_distance(self, pos1, pos2):
+        return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])

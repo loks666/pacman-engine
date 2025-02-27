@@ -1,225 +1,108 @@
 from game import Directions
-import numpy as np
-import heapq
 from game import Agent
+from util import manhattanDistance
+import random
 
-
-def calculate_neighbouring_nodes(node, maze):
-    (x, y) = node
-    h = maze.height
-    w = maze.width
-    res = []
-    for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
-        nx, ny = x + dx, y + dy
-        if 0 <= nx < w and 0 <= ny < h and not maze[nx][ny]:
-            res.append((nx, ny))
-    return res
-
-
-def calculate_gscores(maze, start_node, ghost_positions, ghost_radius=5, scared=False):
-    h = maze.height
-    w = maze.width
-    INF = 999999
-    g = np.full((h, w), INF, dtype=int)
-    p = {}
-    (sx, sy) = start_node
-    g[sy][sx] = 0
-    p[(sx, sy)] = None
-    pq = []
-    heapq.heappush(pq, (0, (sx, sy)))
-
-    # Dynamic cost map: positions near ghosts have higher cost
-    cost_map = np.ones((h, w), dtype=int)
-    for gh_pos in ghost_positions:
-        gh_x, gh_y = gh_pos
-        for x in range(max(0, gh_x - ghost_radius), min(w, gh_x + ghost_radius + 1)):
-            for y in range(max(0, gh_y - ghost_radius), min(h, gh_y + ghost_radius + 1)):
-                dist = abs(x - gh_x) + abs(y - gh_y)
-                if dist <= ghost_radius:
-                    # Increase cost based on distance to ghost
-                    cost_map[y][x] += (ghost_radius - dist + 1) * 10  # Adjust weight as needed
-
-    while pq:
-        d, (cx, cy) = heapq.heappop(pq)
-        if d > g[cy][cx]:
-            continue
-        for (nx, ny) in calculate_neighbouring_nodes((cx, cy), maze):
-            nd = d + cost_map[ny][nx]
-            if nd < g[ny][nx]:
-                g[ny][nx] = nd
-                p[(nx, ny)] = (cx, cy)
-                heapq.heappush(pq, (nd, (nx, ny)))
-
-    # Assign INF to walls to prevent path through walls
-    for x in range(w):
-        for y in range(h):
-            if maze[x][y]:
-                g[y][x] = INF
-    return g, p
-
-
-def calc_path_to_point(end_node, parent_nodes):
-    path = []
-    c = end_node
-    while c in parent_nodes and parent_nodes[c] is not None:
-        pa = parent_nodes[c]
-        px, py = pa
-        cx, cy = c
-        if cx == px + 1 and cy == py:
-            path.append(Directions.EAST)
-        elif cx == px - 1 and cy == py:
-            path.append(Directions.WEST)
-        elif cx == px and cy == py + 1:
-            path.append(Directions.SOUTH)
-        elif cx == px and cy == py - 1:
-            path.append(Directions.NORTH)
-        c = pa
-    path.reverse()
-    return path
-
-
-class ce811DijkstraRuleAgent(Agent):
-    def __init__(self):
-        self.route = []
-        self.last_action = Directions.STOP
+class ce811OneStepLookaheadManhattanAgent(Agent):
+    """
+      A one-step lookahead agent which chooses an action at each choice point by examining
+      its alternatives via a state evaluation function.
+    """
 
     def getAction(self, gameState):
+        """
+        Just like in the tutorial, getAction takes a GameState and returns
+        some Directions.X for some X in the set {North, South, West, East, Stop}
+        """
+        # Collect legal moves and successor states
         legalMoves = gameState.getLegalActions()
-        pac = gameState.getPacmanPosition()
-        maze = gameState.getWalls()
-        foods = gameState.getFood().asList()
-        ghosts = gameState.getGhostStates()
-        caps = gameState.getCapsules()
 
-        # 获取鬼魂的位置和状态
-        ghost_positions = []
-        for gh in ghosts:
-            gh_pos = gh.getPosition()
-            gh_x, gh_y = int(gh_pos[0]), int(gh_pos[1])
-            ghost_positions.append((gh_x, gh_y))
+        # Choose one of the best actions
+        scores = [self.evaluateBoardState(gameState.generatePacmanSuccessor(action)) for action in legalMoves]
+        bestScore = max(scores)
+        bestIndices = [index for index in range(len(scores)) if scores[index] == bestScore]
+        chosenIndex = random.choice(bestIndices) # Pick randomly among the best
+        return legalMoves[chosenIndex]
 
-        # 关键调试信息：Pacman位置与剩余食物数量
-        print(f"Pacman位置: {pac}, 剩余食物数量: {len(foods)}")
+    def evaluateBoardState(self, gameState):
+        """
+        Evaluate the desirability of a given game state.
 
-        # 如果没有食物，停止行动
-        if not foods:
-            print("所有食物已被吃完。")
-            return Directions.STOP
+        We start from the gameState's built-in score, then adjust it based on:
+        - Distances to non-scared ghosts (farther is better)
+        - Distances to scared ghosts (closer is better if we can eat them)
+        - Distance to the nearest food (closer is better)
+        - Distance to the nearest capsule (closer is better)
+        - The fewer the food items left, the better (although this is indirectly handled via the state score)
+        """
 
-        # 找到最近的胶囊（如果有）
-        target_capsule = None
-        min_dist_capsule = float('inf')
-        if caps:
-            for cap in caps:
-                cap_x, cap_y = int(cap[0]), int(cap[1])
-                # 计算曼哈顿距离
-                dist = abs(pac[0] - cap_x) + abs(pac[1] - cap_y)
-                if dist < min_dist_capsule:
-                    min_dist_capsule = dist
-                    target_capsule = cap
+        # Useful information from the state
+        pacman_pos = gameState.getPacmanPosition()
+        food_positions = gameState.getFood().asList()
+        ghost_states = gameState.getGhostStates()
+        capsule_positions = gameState.getCapsules()
 
-        # 找到最近的食物
-        target_food = None
-        min_dist_food = float('inf')
-        for food in foods:
-            food_x, food_y = int(food[0]), int(food[1])
-            dist = abs(pac[0] - food_x) + abs(pac[1] - food_y)
-            if dist < min_dist_food:
-                min_dist_food = dist
-                target_food = food
+        # Current score as baseline
+        evaluation = gameState.getScore()
 
-        # 决定优先级：如果有胶囊且距离较近，优先收集胶囊
-        prioritize_capsule = False
-        CAP_THRESHOLD = 15  # 可以根据需要调整阈值
-        if target_capsule and min_dist_capsule < CAP_THRESHOLD:
-            prioritize_capsule = True
-
-        target = target_capsule if prioritize_capsule else target_food
-        gScores, parents = calculate_gscores(maze, (int(pac[0]), int(pac[1])), ghost_positions)
-        path = calc_path_to_point(target, parents)
-
-        if len(path) == 0:
-            print("无法找到到目标的路径。")
-            return Directions.STOP
-
-        # 引入移动评分系统
-        move_scores = {}
-        for move in legalMoves:
-            if move == Directions.STOP:
-                continue  # 可以根据需要决定是否考虑停顿
-            # 计算移动后的新位置
-            new_pos = self.get_new_position(pac, move)
-            # 计算到最近食物的距离
-            food_dist = self.get_closest_food_distance(new_pos, foods)
-            # 计算到最近鬼魂的距离
-            ghost_dist = self.get_closest_ghost_distance(new_pos, ghosts)
-            # 计算评分：安全性优先，进展次之
-            safety_weight = 10
-            progress_weight = 1
-            score = (ghost_dist * safety_weight) - (food_dist * progress_weight)
-            move_scores[move] = score
-
-        # 选择最高分的移动方向
-        best_move = max(move_scores, key=move_scores.get)
-        best_score = move_scores[best_move]
-
-        # 判断是否存在鬼魂威胁
-        ghost_threat = False
-        for gh in ghosts:
-            gh_pos = gh.getPosition()
-            gh_x, gh_y = int(gh_pos[0]), int(gh_pos[1])
-            d = self.manhattan_distance(pac, (gh_x, gh_y))
-            if d < 5 and gh.scaredTimer <= 1:
-                ghost_threat = True
-                break
-
-        if ghost_threat:
-            # 如果存在鬼魂威胁，选择得分最高的安全移动方向
-            print(f"存在鬼魂威胁，选择移动方向: {best_move}")
-            return best_move
+        # Distances to food
+        if len(food_positions) > 0:
+            food_distances = [manhattanDistance(pacman_pos, food_pos) for food_pos in food_positions]
+            min_food_distance = min(food_distances)
         else:
-            # 如果没有威胁，按计划移动
-            desired_move = path[0]
-            if desired_move in legalMoves:
-                print(f"按计划移动方向: {desired_move}")
-                return desired_move
+            min_food_distance = 0
+
+        # Distances to ghosts
+        ghost_scared_times = [ghostState.scaredTimer for ghostState in ghost_states]
+        ghost_positions = [ghostState.getPosition() for ghostState in ghost_states]
+
+        # Separate ghosts into scared and dangerous
+        dangerous_ghost_distances = []
+        scared_ghost_distances = []
+        for (g_pos, s_time) in zip(ghost_positions, ghost_scared_times):
+            dist = manhattanDistance(pacman_pos, g_pos)
+            if s_time > 1:
+                # Ghost is scared enough to be eaten
+                scared_ghost_distances.append(dist)
             else:
-                # 如果计划的方向被阻挡，选择得分最高的移动方向
-                print("计划的移动方向被阻挡，选择得分最高的移动方向。")
-                print(f"选择移动方向: {best_move}")
-                return best_move
+                # Ghost is dangerous
+                dangerous_ghost_distances.append(dist)
 
-    def get_new_position(self, pos, direction):
-        x, y = pos
-        if direction == Directions.NORTH:
-            return (x, y - 1)
-        elif direction == Directions.SOUTH:
-            return (x, y + 1)
-        elif direction == Directions.EAST:
-            return (x + 1, y)
-        elif direction == Directions.WEST:
-            return (x - 1, y)
+        # Distances to capsules
+        if len(capsule_positions) > 0:
+            capsule_distances = [manhattanDistance(pacman_pos, cap_pos) for cap_pos in capsule_positions]
+            min_capsule_distance = min(capsule_distances)
         else:
-            return pos  # STOP
+            min_capsule_distance = 0
 
-    def get_closest_food_distance(self, pos, foods):
-        min_dist = float('inf')
-        for food in foods:
-            food_x, food_y = int(food[0]), int(food[1])
-            dist = abs(pos[0] - food_x) + abs(pos[1] - food_y)
-            if dist < min_dist:
-                min_dist = dist
-        return min_dist
+        # --- Heuristics ---
 
-    def get_closest_ghost_distance(self, pos, ghosts):
-        min_dist = float('inf')
-        for gh in ghosts:
-            gh_pos = gh.getPosition()
-            gh_x, gh_y = int(gh_pos[0]), int(gh_pos[1])
-            dist = self.manhattan_distance(pos, (gh_x, gh_y))
-            if dist < min_dist:
-                min_dist = dist
-        return min_dist
+        # 1. Prefer being closer to food:
+        # If min_food_distance > 0, we slightly penalize states where the nearest food is far.
+        # Using a negative factor: the farther the food, the worse the evaluation.
+        evaluation -= 2 * min_food_distance
 
-    def manhattan_distance(self, pos1, pos2):
-        return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
+        # 2. Dangerous ghosts:
+        # We want to strongly avoid being close to dangerous ghosts.
+        # A reciprocal-based penalty works well: closer ghosts = higher penalty.
+        for dist in dangerous_ghost_distances:
+            if dist == 0:
+                # Being on the same cell as a dangerous ghost is game-ending
+                evaluation -= 1000
+            else:
+                evaluation -= 30.0 / dist  # The closer a dangerous ghost, the more we penalize
+
+        # 3. Scared ghosts:
+        # If ghosts are scared, being closer is beneficial (we can potentially eat them).
+        # Encourage chasing scared ghosts if they are reachable.
+        for dist in scared_ghost_distances:
+            if dist > 0:
+                evaluation += 20.0 / dist
+
+        # 4. Capsules:
+        # Capsules allow us to scare ghosts, so it's usually good to go towards them.
+        # We'll give a small incentive to be closer to capsules.
+        if min_capsule_distance > 0:
+            evaluation += 5.0 / (min_capsule_distance + 1)
+
+        return evaluation
