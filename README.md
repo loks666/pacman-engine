@@ -30,13 +30,13 @@ python pacman.py -l simpleLoopMazeCapsule -p ce811ManhattanGhostDodgerHunterAgen
 ### 📝 额外任务
 以下命令需要你将 `part2` 文件夹中的相应 `.py` 文件内容复制到 `ce811Assignment2Agents.py` 中后再执行：
 
-1. **一阶前瞻曼哈顿代理**
+1. **一阶预测曼哈顿代理**
     ```bash
     python pacman.py -p ce811OneStepLookaheadManhattanAgent
     ```
     - 将 `part2/1.py` 内容复制到 `ce811Assignment2Agents.py`。
 
-2. **一阶前瞻迪杰斯特拉代理**
+2. **一阶预测迪杰斯特拉代理**
     ```bash
     python pacman.py -p ce811OneStepLookaheadDijkstraAgent
     ```
