@@ -78,5 +78,6 @@ python pacman.py [你的命令] -f -q -n 10
 祝你游戏愉快，挑战成功！🎉🍀
 
 ---
-
+python pacman.py -p ce811MyBestAgent
+python pacman.py -p ce811MyBestAgent -f -q -n 10
 如果你有任何疑问或需要进一步的帮助，请随时联系我，付费费咨询：QQ：284190056
