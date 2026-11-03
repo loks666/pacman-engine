@@ -1,99 +1,109 @@
-# 🎮 Pacman-Agent 挑战
-## 🐱‍👤 pacman-engine
+# Pacman Engine：CE811 智能体挑战
 
-欢迎来到 **Pacman-Agent 挑战**！🎉 这个引擎最初由加州大学伯克利分校的 **John DeNero**和 **Dan Klein**创建。📚
+基于加州大学伯克利分校 John DeNero 和 Dan Klein 创建的 Pacman 引擎，完成 CE811 吃豆人智能体题目。项目从曼哈顿距离规则出发，逐步实现一步前瞻、Dijkstra 路径规划、动态风险代价和综合决策策略。
 
-### 🚀 如何开始
-要以键盘控制的方式运行游戏引擎，请使用以下命令：
+本项目的题目已完成，目前记录的成功率为 **9/10（90%）**，还没有拿到满分。欢迎达到满分的朋友提交 PR，分享实现和测试结果，一起交流优化思路！
+
+## 完成情况与成绩
+
+作者目前记录的结果为：**10 局成功 9 局，均分 700 多分**。Git 历史可以确认明确的 **760.8 分**记录：
+
+- `36cbc95`：`均分760.8`，修改教程智能体。
+- `6387945`、`e157cc5`、`853a731`：继续以 `均分760.8` 为记录优化、清理代码。
+- Part 2 另有 `421`、`616`、`822`、`1177.9`、`1427` 等阶段均分记录；其中 `b0b879e` 的提交信息为 `par2,均分1427`。
+- `c2364a7`：`最后一个，完成`，加入最终综合智能体及其 Part 2 版本。
+
+9/10 来自作者的测试记录；760.8 和 Part 2 各阶段均分来自 Git 提交信息。历史提交没有保存完整的逐局结果和测试配置，不能确认这些数字来自同一智能体、布局或同一批测试，也不能把 1427 直接视为当前最终版本的均分。以上是历史记录，并非本次重新运行的成绩。
+
+游戏得分、通关率与课程评分是不同指标。仓库没有课程评分单或明确的满分标准，因此不将游戏分数换算为课程成绩，也不将 10/10 通关等同于课程满分。
+
+## 快速运行
+
+原 README 使用的 Python 版本为 **3.12.7**。部分智能体依赖 NumPy；图形界面需要可用的 Tkinter。在项目根目录执行：
+
+```bash
+python -m pip install numpy
+```
+
+键盘操作游戏：
+
 ```bash
 python pacman.py
 ```
 
-### 🛠️ 环境配置
-- **Python 版本**：3.12.7 🐍
+运行最终综合智能体：
 
-### 🕹️ 游戏挑战
-以下是简单难度的两个游戏挑战。你需要实现 `ce811ManhattanGhostDodgerAgent` 和 `ce811ManhattanGhostDodgerHunterAgent` 来完成这些挑战。⚔️👻
-
-**注意**：由于难度设置，以下命令可能会报错。你需要修复 `ce811ManhattanGhostDodgerAgent` 后再进行游戏。🔧
-
-#### 挑战1：简单循环迷宫
 ```bash
-python pacman.py -l simpleLoopMaze -p ce811ManhattanGhostDodgerAgent
+python pacman.py -l mediumClassic -p ce811MyBestAgent
 ```
 
-#### 挑战2：带胶囊的简单循环迷宫
+固定随机种子、关闭图形界面并运行 10 局：
+
 ```bash
-python pacman.py -l simpleLoopMazeCapsule -p ce811ManhattanGhostDodgerHunterAgent
+python pacman.py -l mediumClassic -p ce811MyBestAgent -g RandomGhost -k 4 -f -q -n 10
 ```
 
-### 📝 额外任务
-以下命令需要你将 `part2` 文件夹中的相应 `.py` 文件内容复制到 `ce811Assignment2Agents.py` 中后再执行：
+`-f` 固定随机种子，`-q` 使用无图形模式，`-n 10` 运行 10 局。程序输出平均分、布局、逐局分数、胜率和胜负记录。复现实验时请保留完整命令与输出；更换布局、鬼魂策略或随机种子后，结果可能变化。
 
-1. **一阶预测曼哈顿代理**
-    ```bash
-    python pacman.py -p ce811OneStepLookaheadManhattanAgent
-    ```
-    - 将 `part2/1.py` 内容复制到 `ce811Assignment2Agents.py`。
+## 代码组织与题目实现
 
-2. **一阶预测迪杰斯特拉代理**
-    ```bash
-    python pacman.py -p ce811OneStepLookaheadDijkstraAgent
-    ```
-    - 将 `part2/4.py` 内容复制到 `ce811Assignment2Agents.py`。
+- `pacman.py`：游戏入口、命令行参数、智能体加载及成绩汇总。
+- `game.py`、`ghostAgents.py`、`layouts/`：游戏状态、鬼魂策略和地图。
+- `ce811TutorialAgents.py`：当前保留的 `ce811ManhattanGhostDodgerHunterAgent`，包含避鬼、胶囊处理、逃跑状态和移动历史等规则。
+- `ce811Assignment2Agents.py`：当前可直接加载的一步前瞻曼哈顿智能体。
+- `part2/1.py`：一步前瞻曼哈顿方案。
+- `part2/2.py`、`part2/3.py`：Dijkstra 距离计算、父节点记录和路径回溯辅助函数。
+- `part2/4.py`：一步前瞻 Dijkstra 智能体。
+- `part2/5.py`：Dijkstra 规则智能体，结合动态代价与目标选择。
+- `ce811MyBestAgents.py`：可直接运行的最终综合智能体；`part2/ce811MyBestAgents.py` 保留带调试输出的版本。
 
-3. **迪杰斯特拉规则代理**
-    ```bash
-    python pacman.py -l simpleLoopMazeCapsule -p ce811DijkstraRuleAgent
-    ```
-    - 将 `part2/5.py` 内容复制到 `ce811Assignment2Agents.py`。
+各阶段解答以独立文件保留，并未全部合并到默认加载文件中。若要运行 `part2/4.py` 或 `part2/5.py`，请先备份根目录的 `ce811Assignment2Agents.py`，再将相应文件内容复制进去，分别运行对应类名：
 
-4. **迪杰斯特拉规则代理（无迷宫指定）**
-    ```bash
-    python pacman.py -p ce811DijkstraRuleAgent
-    ```
-    - 将 `part2/6.py` 内容复制到 `ce811Assignment2Agents.py`。
-
-### ⚡ 快速获取游戏解决方案
-如果你想快速获得游戏解决方案，可以在每个命令后添加 `-f -q -n 10` 参数。这将以无界面方式运行10次游戏，并为你提供平均分。📈
 ```bash
-python pacman.py [你的命令] -f -q -n 10
+# 复制 part2/4.py 后运行
+python pacman.py -l mediumClassic -p ce811OneStepLookaheadDijkstraAgent -f -q -n 10
+
+# 复制 part2/5.py 后运行
+python pacman.py -l mediumClassic -p ce811DijkstraRuleAgent -f -q -n 10
 ```
 
-### 🛡️ 实现代理
-为了完成 **简单难度** 的两个游戏挑战，你需要实现以下代理：
+`part2/2.py` 和 `part2/3.py` 是辅助函数解答，不是可通过 `-p` 运行的智能体。当前代码中未独立保留早期的 `ce811ManhattanGhostDodgerAgent` 类，可通过 Git 历史查看早期实现。
 
-- **ce811ManhattanGhostDodgerAgent** 🏃‍♂️👻
-- **ce811ManhattanGhostDodgerHunterAgent** 🎯👻
+## 实现原理
 
-确保在运行挑战时，这些代理已正确实现并放置在相应的文件中。🗂️
+### 距离规则与一步前瞻
 
-### ❓ 有问题？
-如果在执行过程中遇到任何问题，请检查以下几点：
+曼哈顿距离使用 `|x1 - x2| + |y1 - y2|`，适合快速判断食物、胶囊和鬼魂的远近，但无法体现墙壁造成的绕路。
 
-1. **Python 版本**是否正确（3.12.7）🐍。
-2. **代理文件**是否已正确复制并命名为 `ce811Assignment2Agents.py` 📂。
-3. **命令参数**是否正确无误 📝。
-4. python pacman.py -p ce811MyBestAgent
-5. python pacman.py -p ce811MyBestAgent -f -q -n 10
+一步前瞻智能体枚举合法动作，通过 `generatePacmanSuccessor` 得到后继状态，再综合游戏得分、最近食物距离、危险鬼魂距离、受惊鬼魂距离及胶囊距离进行评价。当前曼哈顿版本会惩罚靠近危险鬼魂，并奖励靠近受惊鬼魂，从得分最高的动作中随机选择一个。
 
-祝你游戏愉快，挑战成功！🎉🍀
+### Dijkstra 路径规划
 
----
+将非墙壁格子视为图节点，四个方向的可通行相邻格子构成边。使用 `heapq` 优先队列扩展当前累计代价最小的节点，并记录父节点；从目标沿父节点回溯，即可得到行动路径。
 
-如果你有任何疑问或需要进一步的帮助，请随时联系我，付费费咨询：QQ：284190056
+基础版本每步代价为 1，计算考虑墙壁的最短距离；规则版本和综合版本进一步引入鬼魂附近的风险代价，让路线选择同时考虑路程与危险。
 
----
+### 最终综合智能体
 
-### 项目实现思路
-智能体决策被拆分为「目标选择 → 路径规划 → 动作评估 → 策略切换」四个模块：
-- 目标选择：基于曼哈顿距离对食物/胶囊排序，设置胶囊优先阈值，动态选择目标。
-- 路径规划：以迷宫栅格为图执行 Dijkstra，生成最短路；结合鬼魂分布构建动态代价地图，鬼魂半径内按距离提高代价以规避风险。
-- 动作评估：对每个合法动作打分（安全/进度双权重），综合鬼魂距离与食物距离做数值化比较。
-- 策略切换：当检测到近距离非惊吓鬼魂时优先选择“安全评分最高”的动作，安全状态则按规划路径推进。
+`ce811MyBestAgent` 每回合重新读取食物、胶囊、鬼魂位置与受惊时间，执行以下决策：
 
-### 挑战：冲击 100% 通关
-欢迎你在不同布局上尝试实现 100% 通关！你可以从参数调优、代价函数设计、前瞻深度与策略切换规则等方向入手。
-```bash
-python pacman.py -p ce811MyBestAgent -f -q -n 10
-```
+1. **选择目标**：按曼哈顿距离寻找最近食物与胶囊；最近胶囊距离小于 15 时优先选择胶囊，否则选择最近食物。
+2. **生成风险地图**：格子基础代价为 1；在每个鬼魂曼哈顿距离 5 的范围内，叠加 `(5 - 距离 + 1) × 10` 的代价，再用 Dijkstra 规划路线。
+3. **评价候选动作**：排除停止动作，以 `10 × 最近鬼魂距离 - 最近食物距离` 计算安全与进度评分。
+4. **切换策略**：若存在距离小于 5、受惊时间不大于 1 的鬼魂，优先执行评分最高的避险动作；否则执行规划路径的第一步，路径动作不合法时使用候选动作兜底。
+
+这是规则与路径搜索结合的方案，没有训练神经网络。当前综合版本的风险地图和动作距离评分会计入所有鬼魂，受惊状态主要用于触发避险策略；它没有实现多步鬼魂行为预测，也没有使用移动历史防循环逻辑。这些都可以作为后续改进方向。
+
+## 满分方案与 PR 交流
+
+题目虽然已经完成，但当前结果仍有失败局，尚未拿到满分。如果你达到了课程满分、在相同配置下实现 10/10 通关，或找到了更稳定的高分策略，欢迎提交 PR 交流。
+
+请在 PR 中附上：
+
+- 修改的智能体与核心思路。
+- 完整运行命令、Python 和依赖版本。
+- 地图、鬼魂类型及数量、随机种子设置、测试局数。
+- 程序输出的平均分、逐局分数、胜率和胜负记录。
+- 若声称课程满分，请说明评分标准及对应结果。
+
+欢迎讨论更准确的距离评价、死胡同识别、受惊鬼魂追击、循环检测和更深的前瞻搜索，也欢迎提交失败案例，帮助比较不同策略的适用范围。
