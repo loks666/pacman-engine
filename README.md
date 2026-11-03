@@ -45,6 +45,20 @@ python pacman.py -l mediumClassic -p ce811MyBestAgent -g RandomGhost -k 4 -f -q 
 
 `-f` 固定随机种子，`-q` 使用无图形模式，`-n 10` 运行 10 局。程序输出平均分、布局、逐局分数、胜率和胜负记录。复现实验时请保留完整命令与输出；更换布局、鬼魂策略或随机种子后，结果可能变化。
 
+## 运行截图
+
+下图为 `ce811MyBestAgent` 在 `mediumClassic` 地图中的实际运行画面，展示迷宫、食物、胶囊、鬼魂及当前得分。
+
+![综合智能体在 mediumClassic 地图中的运行截图](docs/images/medium-classic-running.png)
+
+截图于 2026-11-03，使用以下命令运行：
+
+```bash
+python pacman.py -l mediumClassic -p ce811MyBestAgent -f --frameTime 0.3 -z 1.5
+```
+
+画面中的 **456 分是截图时的局中得分**，不是最终得分或 10 局平均分；本图用于展示运行效果，不作为上文历史成绩的证明。
+
 ## 代码组织与题目实现
 
 - `pacman.py`：游戏入口、命令行参数、智能体加载及成绩汇总。
