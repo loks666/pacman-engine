@@ -49,7 +49,7 @@ python pacman.py -l mediumClassic -p ce811MyBestAgent -g RandomGhost -k 4 -f -q 
 
 下图为 `ce811MyBestAgent` 在 `mediumClassic` 地图中的实际运行画面，展示迷宫、食物、胶囊、鬼魂及当前得分。
 
-![综合智能体在 mediumClassic 地图中的运行截图](docs/images/medium-classic-running.png)
+![综合智能体在 mediumClassic 地图中的运行截图](docs/images/medium-classic-running.jpg)
 
 截图于 2026-11-03，使用以下命令运行：
 

@@ -17,7 +17,7 @@ gzip.zip
 *.jpg
 *.jepg
 *.png
-!/docs/images/*.png
+!/docs/images/*.jpg
 manage_alpha.sh
 # Byte-compiled / optimized / DLL files
 __pycache__/
